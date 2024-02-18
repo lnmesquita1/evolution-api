@@ -1,4 +1,4 @@
-# 1.6.2 (develop)
+# 1.7.0 (develop)
 
 ### Feature
 
@@ -7,6 +7,9 @@
 * Join in Group by Invite Code
 * Read messages from whatsapp in chatwoot
 * Add support to use use redis in cacheservice
+* Add support for labels
+* Command to clearcache from chatwoot inbox
+* Whatsapp Cloud API Oficial
 
 ### Fixed
 
@@ -31,6 +34,11 @@
 * Fix looping when deleting a message in chatwoot
 * When receiving a file from whatsapp, use the original filename in chatwoot if possible
 * Correction in the sendList Function
+* Implement contact upsert in messaging-history.set
+* Improve proxy error handling
+* Refactor fetching participants for group in WhatsApp service
+* Fixed problem where the typebot final keyword did not work
+* Typebot's wait now pauses the flow and composing is defined by the delay_message parameter in set typebot
 
 # 1.6.1 (2023-12-22 11:43)
 

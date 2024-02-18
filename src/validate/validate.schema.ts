@@ -53,6 +53,8 @@ export const instanceNameSchema: JSONSchema7 = {
           'GROUP_UPDATE',
           'GROUP_PARTICIPANTS_UPDATE',
           'CONNECTION_UPDATE',
+          'LABELS_EDIT',
+          'LABELS_ASSOCIATION',
           'CALL',
           'NEW_JWT_TOKEN',
           'TYPEBOT_START',
@@ -273,6 +275,26 @@ export const audioMessageSchema: JSONSchema7 = {
     },
   },
   required: ['audioMessage', 'number'],
+};
+
+export const templateMessageSchema: JSONSchema7 = {
+  $id: v4(),
+  type: 'object',
+  properties: {
+    number: { ...numberDefinition },
+    options: { ...optionsSchema },
+    templateMessage: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        language: { type: 'string' },
+        components: { type: 'array' },
+      },
+      required: ['name', 'language'],
+      ...isNotEmpty('name', 'language'),
+    },
+  },
+  required: ['templateMessage', 'number'],
 };
 
 export const buttonMessageSchema: JSONSchema7 = {
@@ -897,6 +919,8 @@ export const webhookSchema: JSONSchema7 = {
           'GROUP_UPDATE',
           'GROUP_PARTICIPANTS_UPDATE',
           'CONNECTION_UPDATE',
+          'LABELS_EDIT',
+          'LABELS_ASSOCIATION',
           'CALL',
           'NEW_JWT_TOKEN',
           'TYPEBOT_START',
@@ -923,6 +947,9 @@ export const chatwootSchema: JSONSchema7 = {
     reopen_conversation: { type: 'boolean', enum: [true, false] },
     conversation_pending: { type: 'boolean', enum: [true, false] },
     auto_create: { type: 'boolean', enum: [true, false] },
+    import_contacts: { type: 'boolean', enum: [true, false] },
+    import_messages: { type: 'boolean', enum: [true, false] },
+    days_limit_import_messages: { type: 'number' },
   },
   required: ['enabled', 'account_id', 'token', 'url', 'sign_msg', 'reopen_conversation', 'conversation_pending'],
   ...isNotEmpty('account_id', 'token', 'url', 'sign_msg', 'reopen_conversation', 'conversation_pending'),
@@ -938,9 +965,10 @@ export const settingsSchema: JSONSchema7 = {
     always_online: { type: 'boolean', enum: [true, false] },
     read_messages: { type: 'boolean', enum: [true, false] },
     read_status: { type: 'boolean', enum: [true, false] },
+    sync_full_history: { type: 'boolean', enum: [true, false] },
   },
-  required: ['reject_call', 'groups_ignore', 'always_online', 'read_messages', 'read_status'],
-  ...isNotEmpty('reject_call', 'groups_ignore', 'always_online', 'read_messages', 'read_status'),
+  required: ['reject_call', 'groups_ignore', 'always_online', 'read_messages', 'read_status', 'sync_full_history'],
+  ...isNotEmpty('reject_call', 'groups_ignore', 'always_online', 'read_messages', 'read_status', 'sync_full_history'),
 };
 
 export const websocketSchema: JSONSchema7 = {
@@ -973,6 +1001,8 @@ export const websocketSchema: JSONSchema7 = {
           'GROUP_UPDATE',
           'GROUP_PARTICIPANTS_UPDATE',
           'CONNECTION_UPDATE',
+          'LABELS_EDIT',
+          'LABELS_ASSOCIATION',
           'CALL',
           'NEW_JWT_TOKEN',
           'TYPEBOT_START',
@@ -1016,6 +1046,8 @@ export const rabbitmqSchema: JSONSchema7 = {
           'GROUP_UPDATE',
           'GROUP_PARTICIPANTS_UPDATE',
           'CONNECTION_UPDATE',
+          'LABELS_EDIT',
+          'LABELS_ASSOCIATION',
           'CALL',
           'NEW_JWT_TOKEN',
           'TYPEBOT_START',
@@ -1059,6 +1091,8 @@ export const sqsSchema: JSONSchema7 = {
           'GROUP_UPDATE',
           'GROUP_PARTICIPANTS_UPDATE',
           'CONNECTION_UPDATE',
+          'LABELS_EDIT',
+          'LABELS_ASSOCIATION',
           'CALL',
           'NEW_JWT_TOKEN',
           'TYPEBOT_START',
@@ -1145,4 +1179,15 @@ export const chamaaiSchema: JSONSchema7 = {
   },
   required: ['enabled', 'url', 'token', 'waNumber', 'answerByAudio'],
   ...isNotEmpty('enabled', 'url', 'token', 'waNumber', 'answerByAudio'),
+};
+
+export const handleLabelSchema: JSONSchema7 = {
+  $id: v4(),
+  type: 'object',
+  properties: {
+    number: { ...numberDefinition },
+    labelId: { type: 'string' },
+    action: { type: 'string', enum: ['add', 'remove'] },
+  },
+  required: ['number', 'labelId', 'action'],
 };

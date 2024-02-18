@@ -34,6 +34,7 @@ export type SaveData = {
   MESSAGE_UPDATE: boolean;
   CONTACTS: boolean;
   CHATS: boolean;
+  LABELS: boolean;
 };
 
 export type StoreConf = {
@@ -41,6 +42,7 @@ export type StoreConf = {
   MESSAGE_UP: boolean;
   CONTACTS: boolean;
   CHATS: boolean;
+  LABELS: boolean;
 };
 
 export type CleanStoreConf = {
@@ -84,6 +86,13 @@ export type Websocket = {
   ENABLED: boolean;
 };
 
+export type WaBusiness = {
+  TOKEN_WEBHOOK: string;
+  URL: string;
+  VERSION: string;
+  LANGUAGE: string;
+};
+
 export type EventsWebhook = {
   APPLICATION_STARTUP: boolean;
   INSTANCE_CREATE: boolean;
@@ -103,6 +112,8 @@ export type EventsWebhook = {
   CHATS_DELETE: boolean;
   CHATS_UPSERT: boolean;
   CONNECTION_UPDATE: boolean;
+  LABELS_EDIT: boolean;
+  LABELS_ASSOCIATION: boolean;
   GROUPS_UPSERT: boolean;
   GROUP_UPDATE: boolean;
   GROUP_PARTICIPANTS_UPDATE: boolean;
@@ -149,7 +160,18 @@ export type Webhook = { GLOBAL?: GlobalWebhook; EVENTS: EventsWebhook };
 export type ConfigSessionPhone = { CLIENT: string; NAME: string };
 export type QrCode = { LIMIT: number; COLOR: string };
 export type Typebot = { API_VERSION: string; KEEP_OPEN: boolean };
-export type ChatWoot = { MESSAGE_DELETE: boolean };
+export type Chatwoot = {
+  MESSAGE_DELETE: boolean;
+  IMPORT: {
+    DATABASE: {
+      CONNECTION: {
+        URI: string;
+      };
+    };
+    PLACEHOLDER_MEDIA_MESSAGE: boolean;
+  };
+};
+
 export type CacheConf = { REDIS: CacheConfRedis; LOCAL: CacheConfLocal };
 export type Production = boolean;
 
@@ -164,6 +186,7 @@ export interface Env {
   RABBITMQ: Rabbitmq;
   SQS: Sqs;
   WEBSOCKET: Websocket;
+  WA_BUSINESS: WaBusiness;
   LOG: Log;
   DEL_INSTANCE: DelInstance;
   LANGUAGE: Language;
@@ -171,7 +194,7 @@ export interface Env {
   CONFIG_SESSION_PHONE: ConfigSessionPhone;
   QRCODE: QrCode;
   TYPEBOT: Typebot;
-  CHATWOOT: ChatWoot;
+  CHATWOOT: Chatwoot;
   CACHE: CacheConf;
   AUTHENTICATION: Auth;
   PRODUCTION?: Production;
@@ -226,6 +249,7 @@ export class ConfigService {
         MESSAGE_UP: process.env?.STORE_MESSAGE_UP === 'true',
         CONTACTS: process.env?.STORE_CONTACTS === 'true',
         CHATS: process.env?.STORE_CHATS === 'true',
+        LABELS: process.env?.STORE_LABELS === 'true',
       },
       CLEAN_STORE: {
         CLEANING_INTERVAL: Number.isInteger(process.env?.CLEAN_STORE_CLEANING_TERMINAL)
@@ -248,6 +272,7 @@ export class ConfigService {
           MESSAGE_UPDATE: process.env?.DATABASE_SAVE_MESSAGE_UPDATE === 'true',
           CONTACTS: process.env?.DATABASE_SAVE_DATA_CONTACTS === 'true',
           CHATS: process.env?.DATABASE_SAVE_DATA_CHATS === 'true',
+          LABELS: process.env?.DATABASE_SAVE_DATA_LABELS === 'true',
         },
       },
       REDIS: {
@@ -268,6 +293,12 @@ export class ConfigService {
       },
       WEBSOCKET: {
         ENABLED: process.env?.WEBSOCKET_ENABLED === 'true',
+      },
+      WA_BUSINESS: {
+        TOKEN_WEBHOOK: process.env.WA_BUSINESS_TOKEN_WEBHOOK || '',
+        URL: process.env.WA_BUSINESS_URL || '',
+        VERSION: process.env.WA_BUSINESS_VERSION || '',
+        LANGUAGE: process.env.WA_BUSINESS_LANGUAGE || 'en',
       },
       LOG: {
         LEVEL: (process.env?.LOG_LEVEL.split(',') as LogLevel[]) || [
@@ -312,6 +343,8 @@ export class ConfigService {
           CHATS_UPSERT: process.env?.WEBHOOK_EVENTS_CHATS_UPSERT === 'true',
           CHATS_DELETE: process.env?.WEBHOOK_EVENTS_CHATS_DELETE === 'true',
           CONNECTION_UPDATE: process.env?.WEBHOOK_EVENTS_CONNECTION_UPDATE === 'true',
+          LABELS_EDIT: process.env?.WEBHOOK_EVENTS_LABELS_EDIT === 'true',
+          LABELS_ASSOCIATION: process.env?.WEBHOOK_EVENTS_LABELS_ASSOCIATION === 'true',
           GROUPS_UPSERT: process.env?.WEBHOOK_EVENTS_GROUPS_UPSERT === 'true',
           GROUP_UPDATE: process.env?.WEBHOOK_EVENTS_GROUPS_UPDATE === 'true',
           GROUP_PARTICIPANTS_UPDATE: process.env?.WEBHOOK_EVENTS_GROUP_PARTICIPANTS_UPDATE === 'true',
@@ -338,6 +371,14 @@ export class ConfigService {
       },
       CHATWOOT: {
         MESSAGE_DELETE: process.env.CHATWOOT_MESSAGE_DELETE === 'false',
+        IMPORT: {
+          DATABASE: {
+            CONNECTION: {
+              URI: process.env.CHATWOOT_DATABASE_CONNECTION_URI || '',
+            },
+          },
+          PLACEHOLDER_MEDIA_MESSAGE: process.env?.CHATWOOT_IMPORT_PLACEHOLDER_MEDIA_MESSAGE === 'true',
+        },
       },
       CACHE: {
         REDIS: {

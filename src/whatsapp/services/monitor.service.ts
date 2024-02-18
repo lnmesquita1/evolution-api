@@ -1,23 +1,21 @@
 import { execSync } from 'child_process';
 import EventEmitter2 from 'eventemitter2';
-import { opendirSync, readdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, opendirSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { Db } from 'mongodb';
+import { Collection } from 'mongoose';
 import { join } from 'path';
 
 import { Auth, ConfigService, Database, DelInstance, HttpServer, Redis } from '../../config/env.config';
 import { Logger } from '../../config/logger.config';
 import { INSTANCE_DIR, STORE_DIR } from '../../config/path.config';
 import { NotFoundException } from '../../exceptions';
-import { dbserver } from '../../libs/db.connect';
 import { RedisCache } from '../../libs/redis.client';
 import {
   AuthModel,
   ChamaaiModel,
-  // ChatModel,
   ChatwootModel,
-  // ContactModel,
-  // MessageModel,
-  // MessageUpModel,
+  ContactModel,
+  LabelModel,
   ProxyModel,
   RabbitmqModel,
   SettingsModel,
@@ -26,8 +24,10 @@ import {
   WebsocketModel,
 } from '../models';
 import { RepositoryBroker } from '../repository/repository.manager';
+import { Integration } from '../types/wa.types';
 import { CacheService } from './cache.service';
-import { WAStartupService } from './whatsapp.service';
+import { BaileysStartupService } from './whatsapp.baileys.service';
+import { BusinessStartupService } from './whatsapp.business.service';
 
 export class WAMonitoringService {
   constructor(
@@ -41,7 +41,6 @@ export class WAMonitoringService {
 
     this.removeInstance();
     this.noConnection();
-    // this.delInstanceFiles();
 
     Object.assign(this.db, configService.get<Database>('DATABASE'));
     Object.assign(this.redis, configService.get<Redis>('REDIS'));
@@ -56,10 +55,8 @@ export class WAMonitoringService {
 
   private dbInstance: Db;
 
-  private dbStore = dbserver;
-
   private readonly logger = new Logger(WAMonitoringService.name);
-  public readonly waInstances: Record<string, WAStartupService> = {};
+  public readonly waInstances: Record<string, BaileysStartupService | BusinessStartupService> = {};
 
   public delInstanceTime(instance: string) {
     const time = this.configService.get<DelInstance>('DEL_INSTANCE');
@@ -69,9 +66,11 @@ export class WAMonitoringService {
       setTimeout(async () => {
         if (this.waInstances[instance]?.connectionStatus?.state !== 'open') {
           if (this.waInstances[instance]?.connectionStatus?.state === 'connecting') {
-            await this.waInstances[instance]?.client?.logout('Log out instance: ' + instance);
-            this.waInstances[instance]?.client?.ws?.close();
-            this.waInstances[instance]?.client?.end(undefined);
+            if ((await this.waInstances[instance].findIntegration()).integration === Integration.WHATSAPP_BAILEYS) {
+              await this.waInstances[instance]?.client?.logout('Log out instance: ' + instance);
+              this.waInstances[instance]?.client?.ws?.close();
+              this.waInstances[instance]?.client?.end(undefined);
+            }
             this.waInstances[instance]?.removeRabbitmqQueues();
             delete this.waInstances[instance];
           } else {
@@ -108,6 +107,16 @@ export class WAMonitoringService {
           };
         }
 
+        const findIntegration = await this.waInstances[key].findIntegration();
+
+        let integration: any;
+        if (findIntegration) {
+          integration = {
+            ...findIntegration,
+            webhook_wa_business: `${urlServer}/webhook/whatsapp/${encodeURIComponent(key)}`,
+          };
+        }
+
         if (value.connectionStatus.state === 'open') {
           this.logger.verbose('instance: ' + key + ' - connectionStatus: open');
 
@@ -129,6 +138,8 @@ export class WAMonitoringService {
             instanceData.instance['apikey'] = (await this.repository.auth.find(key))?.apikey;
 
             instanceData.instance['chatwoot'] = chatwoot;
+
+            instanceData.instance['integration'] = integration;
           }
 
           instances.push(instanceData);
@@ -149,6 +160,8 @@ export class WAMonitoringService {
             instanceData.instance['apikey'] = (await this.repository.auth.find(key))?.apikey;
 
             instanceData.instance['chatwoot'] = chatwoot;
+
+            instanceData.instance['integration'] = integration;
           }
 
           instances.push(instanceData);
@@ -161,9 +174,21 @@ export class WAMonitoringService {
     return instances.find((i) => i.instance.instanceName === instanceName) ?? instances;
   }
 
-  public async instanceInfoById(instanceId?: string) {
+  public async instanceInfoById(instanceId?: string, number?: string) {
     this.logger.verbose('get instance info');
-    const instanceName = await this.repository.auth.findInstanceNameById(instanceId);
+    let instanceName: string;
+    if (instanceId) {
+      instanceName = await this.repository.auth.findInstanceNameById(instanceId);
+      if (!instanceName) {
+        throw new NotFoundException(`Instance "${instanceId}" not found`);
+      }
+    } else if (number) {
+      instanceName = await this.repository.auth.findInstanceNameByNumber(number);
+      if (!instanceName) {
+        throw new NotFoundException(`Instance "${number}" not found`);
+      }
+    }
+
     if (!instanceName) {
       throw new NotFoundException(`Instance "${instanceId}" not found`);
     }
@@ -172,75 +197,7 @@ export class WAMonitoringService {
       throw new NotFoundException(`Instance "${instanceName}" not found`);
     }
 
-    const instances: any[] = [];
-
-    for await (const [key, value] of Object.entries(this.waInstances)) {
-      if (value) {
-        this.logger.verbose('get instance info: ' + key);
-        let chatwoot: any;
-
-        const urlServer = this.configService.get<HttpServer>('SERVER').URL;
-
-        const findChatwoot = await this.waInstances[key].findChatwoot();
-
-        if (findChatwoot && findChatwoot.enabled) {
-          chatwoot = {
-            ...findChatwoot,
-            webhook_url: `${urlServer}/chatwoot/webhook/${encodeURIComponent(key)}`,
-          };
-        }
-
-        if (value.connectionStatus.state === 'open') {
-          this.logger.verbose('instance: ' + key + ' - connectionStatus: open');
-
-          const instanceData = {
-            instance: {
-              instanceName: key,
-              instanceId: (await this.repository.auth.find(key))?.instanceId,
-              owner: value.wuid,
-              profileName: (await value.getProfileName()) || 'not loaded',
-              profilePictureUrl: value.profilePictureUrl,
-              profileStatus: (await value.getProfileStatus()) || '',
-              status: value.connectionStatus.state,
-            },
-          };
-
-          if (this.configService.get<Auth>('AUTHENTICATION').EXPOSE_IN_FETCH_INSTANCES) {
-            instanceData.instance['serverUrl'] = this.configService.get<HttpServer>('SERVER').URL;
-
-            instanceData.instance['apikey'] = (await this.repository.auth.find(key))?.apikey;
-
-            instanceData.instance['chatwoot'] = chatwoot;
-          }
-
-          instances.push(instanceData);
-        } else {
-          this.logger.verbose('instance: ' + key + ' - connectionStatus: ' + value.connectionStatus.state);
-
-          const instanceData = {
-            instance: {
-              instanceName: key,
-              instanceId: (await this.repository.auth.find(key))?.instanceId,
-              status: value.connectionStatus.state,
-            },
-          };
-
-          if (this.configService.get<Auth>('AUTHENTICATION').EXPOSE_IN_FETCH_INSTANCES) {
-            instanceData.instance['serverUrl'] = this.configService.get<HttpServer>('SERVER').URL;
-
-            instanceData.instance['apikey'] = (await this.repository.auth.find(key))?.apikey;
-
-            instanceData.instance['chatwoot'] = chatwoot;
-          }
-
-          instances.push(instanceData);
-        }
-      }
-    }
-
-    this.logger.verbose('return instance info: ' + instances.length);
-
-    return instances.find((i) => i.instance.instanceName === instanceName) ?? instances;
+    return this.instanceInfo(instanceName);
   }
 
   private delInstanceFiles() {
@@ -320,16 +277,12 @@ export class WAMonitoringService {
       execSync(`rm -rf ${join(STORE_DIR, 'typebot', instanceName + '*')}`);
       execSync(`rm -rf ${join(STORE_DIR, 'websocket', instanceName + '*')}`);
       execSync(`rm -rf ${join(STORE_DIR, 'settings', instanceName + '*')}`);
+      execSync(`rm -rf ${join(STORE_DIR, 'labels', instanceName + '*')}`);
 
       return;
     }
 
     this.logger.verbose('cleaning store database instance: ' + instanceName);
-
-    // await ChatModel.deleteMany({ owner: instanceName });
-    // await ContactModel.deleteMany({ owner: instanceName });
-    // await MessageUpModel.deleteMany({ owner: instanceName });
-    // await MessageModel.deleteMany({ owner: instanceName });
 
     await AuthModel.deleteMany({ _id: instanceName });
     await WebhookModel.deleteMany({ _id: instanceName });
@@ -340,6 +293,8 @@ export class WAMonitoringService {
     await TypebotModel.deleteMany({ _id: instanceName });
     await WebsocketModel.deleteMany({ _id: instanceName });
     await SettingsModel.deleteMany({ _id: instanceName });
+    await LabelModel.deleteMany({ owner: instanceName });
+    await ContactModel.deleteMany({ owner: instanceName });
 
     return;
   }
@@ -360,14 +315,47 @@ export class WAMonitoringService {
     }
   }
 
+  public async saveInstance(data: any) {
+    this.logger.verbose('Save instance');
+
+    try {
+      const msgParsed = JSON.parse(JSON.stringify(data));
+      if (this.db.ENABLED && this.db.SAVE_DATA.INSTANCE) {
+        await this.repository.dbServer.connect();
+        await this.dbInstance.collection(data.instanceName).replaceOne({ _id: 'integration' }, msgParsed, {
+          upsert: true,
+        });
+      } else {
+        const path = join(INSTANCE_DIR, data.instanceName);
+        if (!existsSync(path)) mkdirSync(path, { recursive: true });
+        writeFileSync(path + '/integration.json', JSON.stringify(msgParsed));
+      }
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+
   private async setInstance(name: string) {
-    const instance = new WAStartupService(
-      this.configService,
-      this.eventEmitter,
-      this.repository,
-      this.cache,
-      this.chatwootCache,
-    );
+    const integration = await this.repository.integration.find(name);
+
+    let instance: BaileysStartupService | BusinessStartupService;
+    if (integration && integration.integration === Integration.WHATSAPP_BUSINESS) {
+      instance = new BusinessStartupService(
+        this.configService,
+        this.eventEmitter,
+        this.repository,
+        this.cache,
+        this.chatwootCache,
+      );
+    } else {
+      instance = new BaileysStartupService(
+        this.configService,
+        this.eventEmitter,
+        this.repository,
+        this.cache,
+        this.chatwootCache,
+      );
+    }
     instance.instanceName = name;
     this.logger.verbose('Instance loaded: ' + name);
     await instance.connectToWhatsapp();
@@ -393,7 +381,7 @@ export class WAMonitoringService {
     this.logger.verbose('Database enabled');
     await this.repository.dbServer.connect();
     const collections: any[] = await this.dbInstance.collections();
-
+    await this.deleteTempInstances(collections);
     if (collections.length > 0) {
       this.logger.verbose('Reading collections and setting instances');
       await Promise.all(collections.map((coll) => this.setInstance(coll.namespace.replace(/^[\w-]+\./, ''))));
@@ -481,5 +469,23 @@ export class WAMonitoringService {
         this.logger.warn(`Instance "${instanceName}" - NOT CONNECTION`);
       }
     });
+  }
+
+  private async deleteTempInstances(collections: Collection<Document>[]) {
+    this.logger.verbose('Cleaning up temp instances');
+    const auths = await this.repository.auth.list();
+    if (auths.length === 0) {
+      this.logger.verbose('No temp instances found');
+      return;
+    }
+    let tempInstances = 0;
+    auths.forEach((auth) => {
+      if (collections.find((coll) => coll.namespace.replace(/^[\w-]+\./, '') === auth._id)) {
+        return;
+      }
+      tempInstances++;
+      this.eventEmitter.emit('remove.instance', auth._id, 'inner');
+    });
+    this.logger.verbose('Temp instances removed: ' + tempInstances);
   }
 }
