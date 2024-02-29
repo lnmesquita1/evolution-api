@@ -32,6 +32,7 @@ import makeWASocket, {
   WAMediaUpload,
   WAMessage,
   WAMessageUpdate,
+  WAPresence,
   WASocket,
 } from '@whiskeysockets/baileys';
 import { Label } from '@whiskeysockets/baileys/lib/Types/Label';
@@ -63,6 +64,7 @@ import { useMultiFileAuthStateDb } from '../../utils/use-multi-file-auth-state-d
 import { useMultiFileAuthStateRedisDb } from '../../utils/use-multi-file-auth-state-redis-db';
 import {
   ArchiveChatDto,
+  BlockUserDto,
   DeleteMessage,
   getBase64FromMediaMessageDto,
   LastMessage,
@@ -1622,17 +1624,37 @@ export class BaileysStartupService extends WAStartupService {
       if (options?.delay) {
         this.logger.verbose('Delaying message');
 
-        await this.client.presenceSubscribe(sender);
-        this.logger.verbose('Subscribing to presence');
+        if (options.delay > 20000) {
+          let remainingDelay = options.delay;
+          while (remainingDelay > 20000) {
+            await this.client.presenceSubscribe(sender);
 
-        await this.client.sendPresenceUpdate(options?.presence ?? 'composing', sender);
-        this.logger.verbose('Sending presence update: ' + options?.presence ?? 'composing');
+            await this.client.sendPresenceUpdate((options.presence as WAPresence) ?? 'composing', sender);
 
-        await delay(options.delay);
-        this.logger.verbose('Set delay: ' + options.delay);
+            await delay(20000);
 
-        await this.client.sendPresenceUpdate('paused', sender);
-        this.logger.verbose('Sending presence update: paused');
+            await this.client.sendPresenceUpdate('paused', sender);
+
+            remainingDelay -= 20000;
+          }
+          if (remainingDelay > 0) {
+            await this.client.presenceSubscribe(sender);
+
+            await this.client.sendPresenceUpdate((options.presence as WAPresence) ?? 'composing', sender);
+
+            await delay(remainingDelay);
+
+            await this.client.sendPresenceUpdate('paused', sender);
+          }
+        } else {
+          await this.client.presenceSubscribe(sender);
+
+          await this.client.sendPresenceUpdate((options.presence as WAPresence) ?? 'composing', sender);
+
+          await delay(options.delay);
+
+          await this.client.sendPresenceUpdate('paused', sender);
+        }
       }
 
       const linkPreview = options?.linkPreview != false ? undefined : false;
@@ -2793,6 +2815,29 @@ export class BaileysStartupService extends WAStartupService {
       return { update: 'success' };
     } catch (error) {
       throw new InternalServerErrorException('Error removing profile picture', error.toString());
+    }
+  }
+
+  public async blockUser(data: BlockUserDto) {
+    this.logger.verbose('Blocking user: ' + data.number);
+    try {
+      const { number } = data;
+
+      this.logger.verbose(`Check if number "${number}" is WhatsApp`);
+      const isWA = (await this.whatsappNumber({ numbers: [number] }))?.shift();
+
+      this.logger.verbose(`Exists: "${isWA.exists}" | jid: ${isWA.jid}`);
+      if (!isWA.exists && !isJidGroup(isWA.jid) && !isWA.jid.includes('@broadcast')) {
+        throw new BadRequestException(isWA);
+      }
+
+      const sender = isWA.jid;
+
+      await this.client.updateBlockStatus(sender, data.status);
+
+      return { block: 'success' };
+    } catch (error) {
+      throw new InternalServerErrorException('Error blocking user', error.toString());
     }
   }
 
