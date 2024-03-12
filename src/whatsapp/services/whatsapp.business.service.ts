@@ -13,6 +13,7 @@ import {
   ContactMessage,
   MediaMessage,
   Options,
+  SendAudioDto,
   SendButtonDto,
   SendContactDto,
   SendListDto,
@@ -302,7 +303,6 @@ export class BusinessStartupService extends WAStartupService {
       if (received.contacts) pushName = received.contacts[0].profile.name;
 
       if (received.messages) {
-        console.log('received?.messages[0]', received?.messages[0]);
         const key = {
           id: received.messages[0].id,
           remoteJid: this.phoneNumber,
@@ -675,6 +675,20 @@ export class BusinessStartupService extends WAStartupService {
           quoted ? (content.context = { message_id: quoted.id }) : content;
           return await this.post(content, 'messages');
         }
+        if (message['audio']) {
+          this.logger.verbose('Sending message');
+          content = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            type: 'audio',
+            to: number.replace(/\D/g, ''),
+            audio: {
+              [message['type']]: message['id'],
+            },
+          };
+          quoted ? (content.context = { message_id: quoted.id }) : content;
+          return await this.post(content, 'messages');
+        }
         if (message['buttons']) {
           this.logger.verbose('Sending message');
           content = {
@@ -756,9 +770,6 @@ export class BusinessStartupService extends WAStartupService {
           return await this.post(content, 'messages');
         }
       })();
-
-      console.log('messageSent', messageSent);
-      console.log('message', message);
 
       const messageRaw: MessageRaw = {
         key: { fromMe: true, id: messageSent?.messages[0]?.id, remoteJid: this.createJid(number) },
@@ -888,6 +899,45 @@ export class BusinessStartupService extends WAStartupService {
   public async mediaMessage(data: SendMediaDto, isChatwoot = false) {
     this.logger.verbose('Sending media message');
     const message = await this.prepareMediaMessage(data.mediaMessage);
+
+    return await this.sendMessageWithTyping(data.number, { ...message }, data?.options, isChatwoot);
+  }
+
+  public async processAudio(audio: string, number: string) {
+    this.logger.verbose('Processing audio');
+
+    number = number.replace(/\D/g, '');
+    const hash = `${number}-${new Date().getTime()}`;
+    this.logger.verbose('Hash to audio name: ' + hash);
+
+    let mimetype: string;
+
+    const prepareMedia: any = {
+      fileName: `${hash}.mp3`,
+      mediaType: 'audio',
+      media: audio,
+    };
+
+    if (isURL(audio)) {
+      mimetype = getMIMEType(audio);
+      prepareMedia.id = audio;
+      prepareMedia.type = 'link';
+    } else {
+      mimetype = getMIMEType(prepareMedia.fileName);
+      const id = await this.getIdMedia(prepareMedia);
+      prepareMedia.id = id;
+      prepareMedia.type = 'id';
+    }
+
+    prepareMedia.mimetype = mimetype;
+
+    return prepareMedia;
+  }
+
+  public async audioWhatsapp(data: SendAudioDto, isChatwoot = false) {
+    this.logger.verbose('Sending audio whatsapp');
+
+    const message = await this.processAudio(data.audioMessage.audio, data.number);
 
     return await this.sendMessageWithTyping(data.number, { ...message }, data?.options, isChatwoot);
   }
@@ -1106,9 +1156,6 @@ export class BusinessStartupService extends WAStartupService {
 
   // methods not available on WhatsApp Business API
   public async mediaSticker() {
-    throw new BadRequestException('Method not available on WhatsApp Business API');
-  }
-  public async audioWhatsapp() {
     throw new BadRequestException('Method not available on WhatsApp Business API');
   }
   public async pollMessage() {
