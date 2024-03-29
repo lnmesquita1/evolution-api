@@ -483,7 +483,7 @@ export class BusinessStartupService extends WAStartupService {
           if (key.remoteJid !== 'status@broadcast' && !key?.remoteJid?.match(/(:\d+)/)) {
             this.logger.verbose('Message update is valid');
 
-            if (item.status === 'read' && !key.fromMe) return;
+            if (item.status === 'read' && key.fromMe) return;
 
             if (item.message === null && item.status === undefined) {
               this.logger.verbose('Message deleted');
