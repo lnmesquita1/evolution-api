@@ -47,7 +47,7 @@ export class WebhookRouter extends RouterBroker {
 
         res.status(HttpStatus.OK).json(response);
       })
-      .post(this.routerPath('whatsapp'), async (req, res) => {
+      .post('/whatsapp', async (req, res) => {
         logger.verbose('request received in webhook');
         logger.verbose('request body: ');
         logger.verbose(req.body);
@@ -58,12 +58,12 @@ export class WebhookRouter extends RouterBroker {
           request: req,
           schema: instanceNameSchema,
           ClassRef: InstanceDto,
-          execute: (instance, data) => webhookController.receiveWebhook(instance, data),
+          execute: (instance) => webhookController.receiveWebhook(instance),
         });
 
         res.status(HttpStatus.OK).json(response);
       })
-      .get(this.routerPath('whatsapp'), async (req, res) => {
+      .get('/whatsapp', async (req, res) => {
         logger.verbose('request received in webhook');
         logger.verbose('request query: ');
         logger.verbose(req.query);

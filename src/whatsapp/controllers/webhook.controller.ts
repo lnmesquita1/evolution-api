@@ -65,8 +65,9 @@ export class WebhookController {
     return this.webhookService.find(instance);
   }
 
-  public async receiveWebhook(instance: InstanceDto, data: any) {
-    logger.verbose('requested receiveWebhook from ' + instance.instanceName + ' instance');
-    return await this.waMonitor.waInstances[instance.instanceName].connectToWhatsapp(data);
+  public async receiveWebhook(data: any) {
+    const wabaId = data.entry[0].id;
+    logger.verbose('requested receiveWebhook from wabaId: ' + wabaId + ' instance');
+    return await this.waMonitor.waInstances[wabaId].connectToWhatsapp(data);
   }
 }
