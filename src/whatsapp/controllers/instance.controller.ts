@@ -152,7 +152,7 @@ export class InstanceController {
         this.logger.verbose('creating webhook');
         try {
           let newEvents: string[] = [];
-          if (events.length === 0) {
+          if (!events || events.length === 0) {
             newEvents = [
               'APPLICATION_STARTUP',
               'QRCODE_UPDATED',
@@ -391,7 +391,8 @@ export class InstanceController {
           throw new BadRequestException('number is required');
         }
         const urlServer = this.configService.get<HttpServer>('SERVER').URL;
-        webhook_wa_business = `${urlServer}/webhook/whatsapp/${encodeURIComponent(instance.instanceName)}`;
+        const webHookTest = this.configService.get<WaBusiness>('WA_BUSINESS').WEBHOOK_TEST;
+        webhook_wa_business = `${webHookTest ? webHookTest : urlServer}/webhook/whatsapp`;
         access_token_wa_business = this.configService.get<WaBusiness>('WA_BUSINESS').TOKEN_WEBHOOK;
       }
 

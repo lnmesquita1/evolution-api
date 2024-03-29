@@ -93,6 +93,7 @@ export type WaBusiness = {
   URL: string;
   VERSION: string;
   LANGUAGE: string;
+  WEBHOOK_TEST: string;
 };
 
 export type EventsWebhook = {
@@ -305,6 +306,7 @@ export class ConfigService {
         URL: process.env.WA_BUSINESS_URL || '',
         VERSION: process.env.WA_BUSINESS_VERSION || '',
         LANGUAGE: process.env.WA_BUSINESS_LANGUAGE || 'en',
+        WEBHOOK_TEST: process.env.WA_BUSINESS_WEBHOOK_TEST || ''
       },
       LOG: {
         LEVEL: (process.env?.LOG_LEVEL.split(',') as LogLevel[]) || [
