@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { arrayUnique, isURL } from 'class-validator';
 import EventEmitter2 from 'eventemitter2';
-import FormData from 'form-data';
-import fs from 'fs/promises';
 import { getMIMEType } from 'node-mime-types';
 
 import { ConfigService, Database, WaBusiness } from '../../config/env.config';
@@ -820,21 +818,25 @@ export class BusinessStartupService extends WAStartupService {
 
   private async getIdMedia(mediaMessage: any) {
     const integration = await this.findIntegration();
-
     const formData = new FormData();
 
-    const fileBuffer = await fs.readFile(mediaMessage.media);
-
-    const fileBlob = new Blob([fileBuffer], { type: mediaMessage.mimetype });
-    formData.append('file', fileBlob);
-    formData.append('typeFile', mediaMessage.mimetype);
+    const buffer = Buffer.from(mediaMessage.media, 'base64');
+    const fileBlob = new Blob([buffer], { type: mediaMessage.mimetype });
+    
     formData.append('messaging_product', 'whatsapp');
-    const headers = { Authorization: `Bearer ${integration.token}` };
-    const res = await axios.post(
-      process.env.API_URL + '/' + process.env.VERSION + '/' + integration.number + '/media',
-      formData,
-      { headers },
-    );
+    formData.append('type', mediaMessage.mimetype);
+    formData.append('file', fileBlob);
+    const headers = { "Content-Type": "multipart/form-data", Authorization: `Bearer ${integration.token}` };
+    let urlServer = this.configService.get<WaBusiness>('WA_BUSINESS').URL;
+    const version = this.configService.get<WaBusiness>('WA_BUSINESS').VERSION;
+    let res: any;
+    try {
+      res = await axios.post(urlServer + '/' + version + '/' + integration.number + '/media', formData, { headers });
+    } catch (error) {
+      if (error.response) {
+        this.logger.info(JSON.stringify(error.response.data));
+      }
+    }
     return res.data.id;
   }
 
@@ -880,6 +882,7 @@ export class BusinessStartupService extends WAStartupService {
           prepareMedia.type = 'link';
         } else {
           mimetype = getMIMEType(mediaMessage.fileName);
+          prepareMedia.mimetype = mimetype;
           const id = await this.getIdMedia(prepareMedia);
           prepareMedia.id = id;
           prepareMedia.type = 'id';
@@ -924,6 +927,7 @@ export class BusinessStartupService extends WAStartupService {
       prepareMedia.type = 'link';
     } else {
       mimetype = getMIMEType(prepareMedia.fileName);
+      prepareMedia.mimetype = mimetype;
       const id = await this.getIdMedia(prepareMedia);
       prepareMedia.id = id;
       prepareMedia.type = 'id';
