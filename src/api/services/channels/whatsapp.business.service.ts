@@ -330,7 +330,8 @@ export class BusinessStartupService extends ChannelStartupService {
           received?.messages[0].document ||
           received?.messages[0].image ||
           received?.messages[0].audio ||
-          received?.messages[0].video
+          received?.messages[0].video ||
+          received?.messages[0].sticker
         ) {
           const buffer = await this.downloadMediaMessage(received?.messages[0]);
           messageRaw = {
