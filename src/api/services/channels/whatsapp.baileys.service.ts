@@ -1365,7 +1365,6 @@ export class BaileysStartupService extends ChannelStartupService {
 
     'message-receipt.update': async (args: WAMessageUpdate[], database: Database, settings: SettingsRaw) => {
 
-      console.log("PASSANDO AQUI NO RECEIPT:::")
       this.logger.verbose('Event received: message-receipt.update');
       const status: Record<number, wa.StatusMessage> = {
         0: 'ERROR',
