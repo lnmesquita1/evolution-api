@@ -87,6 +87,18 @@ export class MessageUpdateRaw {
   pollUpdates?: any;
 }
 
+export class MessageReceiptUpdateRaw {
+  _id?: string;
+  remoteJid?: string;
+  id?: string;
+  fromMe?: boolean;
+  participant?: string;
+  datetime?: number;
+  status?: wa.StatusMessage;
+  owner: string;
+  pollUpdates?: any;
+}
+
 const messageUpdateSchema = new Schema<MessageUpdateRaw>({
   _id: { type: String, _id: true },
   remoteJid: { type: String, required: true, min: 1 },

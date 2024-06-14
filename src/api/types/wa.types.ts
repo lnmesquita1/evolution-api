@@ -12,6 +12,7 @@ export enum Events {
   MESSAGES_UPSERT = 'messages.upsert',
   MESSAGES_UPDATE = 'messages.update',
   MESSAGES_DELETE = 'messages.delete',
+  MESSAGE_RECEIPT_UPDATE = 'message-receipt.update',
   SEND_MESSAGE = 'send.message',
   CONTACTS_SET = 'contacts.set',
   CONTACTS_UPSERT = 'contacts.upsert',
