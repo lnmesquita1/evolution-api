@@ -124,7 +124,7 @@ import { chatwootImport } from '../../integrations/chatwoot/utils/chatwoot-impor
 import { SettingsRaw } from '../../models';
 import { ChatRaw } from '../../models/chat.model';
 import { ContactRaw } from '../../models/contact.model';
-import { MessageRaw, MessageUpdateRaw } from '../../models/message.model';
+import { MessageRaw, MessageUpdateRaw, MessageReceiptUpdateRaw } from '../../models/message.model';
 import { ProviderFiles } from '../../provider/sessions';
 import { RepositoryBroker } from '../../repository/repository.manager';
 import { waMonitor } from '../../server.module';
@@ -369,7 +369,7 @@ export class BaileysStartupService extends ChannelStartupService {
       qrcodeTerminal.generate(qr, { small: true }, (qrcode) =>
         this.logger.log(
           `\n{ instance: ${this.instance.name} pairingCode: ${this.instance.qrcode.pairingCode}, qrcodeCount: ${this.instance.qrcode.count} }\n` +
-            qrcode,
+          qrcode,
         ),
       );
     }
@@ -1430,7 +1430,103 @@ export class BaileysStartupService extends ChannelStartupService {
         }
       }
     },
+
+    'message-receipt.update': async (args: WAMessageUpdate[], database: Database, settings: SettingsRaw) => {
+
+      this.logger.verbose('Event received: message-receipt.update');
+      const status: Record<number, wa.StatusMessage> = {
+        0: 'ERROR',
+        1: 'PENDING',
+        2: 'SERVER_ACK',
+        3: 'DELIVERY_ACK',
+        4: 'READ',
+        5: 'PLAYED',
+      };
+
+      for await (const { key, update } of args) {
+        if (settings?.groups_ignore && key.remoteJid?.includes('@g.us')) {
+          this.logger.verbose('group ignored');
+          return;
+        }
+       
+        if (status[update.status] === 'READ' && key.fromMe) {
+          if (this.localChatwoot.enabled) {
+            this.chatwootService.eventWhatsapp('messages.read', { instanceName: this.instance.name }, { key: key });
+          }
+        }
+
+        if (key.remoteJid !== 'status@broadcast') {
+          this.logger.verbose('Message Receipt update is valid');
+
+          let pollUpdates: any;
+          if (update.pollUpdates) {
+            this.logger.verbose('Poll update found');
+
+            this.logger.verbose('Getting poll message');
+            const pollCreation = await this.getMessage(key);
+            this.logger.verbose(pollCreation);
+
+            if (pollCreation) {
+              this.logger.verbose('Getting aggregate votes in poll message');
+              pollUpdates = getAggregateVotesInPollMessage({
+                message: pollCreation as proto.IMessage,
+                pollUpdates: update.pollUpdates,
+              });
+            }
+          }
+
+          if (status[update.status] === 'READ' && !key.fromMe) return;
+
+          if (update.message === null && update.status === undefined) {
+            this.logger.verbose('Message deleted');
+
+            this.logger.verbose('Sending data to webhook in event MESSAGE_DELETE');
+            this.sendDataWebhook(Events.MESSAGES_DELETE, key);
+
+            const message: MessageReceiptUpdateRaw = {
+              ...key,
+              status: 'DELETED',
+              datetime: Date.now(),
+              owner: this.instance.name,
+            };
+
+            this.logger.verbose(message);
+
+            this.logger.verbose('Inserting message in database');
+            await this.repository.messageUpdate.insert(
+              [message],
+              this.instance.name,
+              database.SAVE_DATA.MESSAGE_UPDATE,
+            );
+
+            if (this.localChatwoot.enabled) {
+              this.chatwootService.eventWhatsapp(
+                Events.MESSAGES_DELETE,
+                { instanceName: this.instance.name },
+                { key: key },
+              );
+            }
+
+            return;
+          }
+
+          const message: MessageReceiptUpdateRaw = {
+            ...key,
+            status: status[update.status],
+            datetime: Date.now(),
+            owner: this.instance.name,
+            pollUpdates,
+          };
+
+          this.logger.verbose(message);
+
+          this.logger.verbose('Sending data to webhook in event MESSAGE-RECEIPT-UPDATE');
+          this.sendDataWebhook(Events.MESSAGE_RECEIPT_UPDATE, message);
+        }
+      }
+    },
   };
+
 
   private readonly groupHandler = {
     'groups.upsert': (groupMetadata: GroupMetadata[]) => {
@@ -1602,6 +1698,29 @@ export class BaileysStartupService extends ChannelStartupService {
           this.messageHandle['messages.update'](payload, database, settings);
         }
 
+        if (events['message-receipt.update']) {
+
+          this.logger.verbose('Listening event: message-receipt.update');
+          let payload;
+          payload = events['message-receipt.update'];
+          payload.forEach(el => {
+            if (!el.update) {
+              if (this.hasProperty(el, 'pendingDeviceJid')) {
+                el.update = { status: 1 };
+              } else if (this.hasProperty(el, 'receiptTimestamp')) {
+                el.update = { status: 3 };
+              } else if (this.hasProperty(el, 'readTimestamp')) {
+                el.update = { status: 4 };
+              } else if (this.hasProperty(el, 'playedTimestamp')) {
+                el.update = { status: 5 };
+              } else {
+                el.update = { status: 0 };
+              }
+            }
+          });
+          this.messageHandle['message-receipt.update'](payload, database, settings);
+        }
+
         if (events['presence.update']) {
           this.logger.verbose('Listening event: presence.update');
           const payload = events['presence.update'];
@@ -1678,6 +1797,17 @@ export class BaileysStartupService extends ChannelStartupService {
         }
       }
     });
+  }
+
+  private hasProperty(obj: any, prop: string): boolean {
+    if (obj == null) return false;
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) return true;
+    for (let key in obj) {
+      if (typeof obj[key] === 'object' && this.hasProperty(obj[key], prop)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private historySyncNotification(msg: proto.Message.IHistorySyncNotification) {
