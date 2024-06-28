@@ -1319,7 +1319,7 @@ export class BaileysStartupService extends ChannelStartupService {
 
             this.logger.verbose('Updating contact in database');
             await this.repository.contact.update([contactRaw], this.instance.name, database.SAVE_DATA.CONTACTS);
-            return;
+            continue;
           }
 
           this.logger.verbose('Contact not found in database');
