@@ -1202,7 +1202,7 @@ export class ChannelStartupService {
       .split(':')[0]
       .split('@')[0];
 
-    if (number.includes('-') && number.length >= 24) {
+    if (number.includes('-') && number.length >= 23) {
       this.logger.verbose('Jid created is group: ' + `${number}@g.us`);
       number = number.replace(/[^\d-]/g, '');
       return `${number}@g.us`;
