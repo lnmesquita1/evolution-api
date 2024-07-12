@@ -1047,6 +1047,7 @@ export class BaileysStartupService extends ChannelStartupService {
       try {
         this.logger.verbose('Event received: messages.upsert');
         for (const received of messages) {
+          let messageRaw: MessageRaw;
           if (
             this.localChatwoot.enabled &&
             (received.message?.protocolMessage?.editedMessage || received.message?.editedMessage?.message)
@@ -1060,8 +1061,23 @@ export class BaileysStartupService extends ChannelStartupService {
 
           if (received.messageStubParameters && received.messageStubParameters[0] === 'Message absent from node') {
             this.logger.info('Recovering message lost');
-
             await this.baileysCache.set(received.key.id, received);
+            
+            messageRaw = {
+              key: received.key,
+              pushName: received.pushName,
+              messageType: 'ciphertext',
+              messageTimestamp: received.messageTimestamp as number,
+              owner: this.instance.name,
+              source: getDevice(received.key.id),
+            };
+
+            this.logger.verbose('Sending data ciphertext to webhook in event MESSAGES_UPSERT');
+            this.sendDataWebhook(Events.MESSAGES_UPSERT, messageRaw);
+
+            this.logger.verbose('Inserting ciphertext in database');
+            await this.repository.message.insert([messageRaw], this.instance.name, database.SAVE_DATA.NEW_MESSAGE);
+            
             continue;
           }
 
@@ -1090,8 +1106,6 @@ export class BaileysStartupService extends ChannelStartupService {
             this.logger.verbose('group ignored');
             return;
           }
-
-          let messageRaw: MessageRaw;
 
           const isMedia =
             received?.message?.imageMessage ||
