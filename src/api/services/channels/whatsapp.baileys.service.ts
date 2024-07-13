@@ -1067,6 +1067,7 @@ export class BaileysStartupService extends ChannelStartupService {
               key: received.key,
               pushName: received.pushName,
               messageType: 'ciphertext',
+              message: {},
               messageTimestamp: received.messageTimestamp as number,
               owner: this.instance.name,
               source: getDevice(received.key.id),
