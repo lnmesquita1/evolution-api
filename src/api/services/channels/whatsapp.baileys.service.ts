@@ -897,7 +897,7 @@ export class BaileysStartupService extends ChannelStartupService {
         chats: Chat[];
         contacts: Contact[];
         messages: proto.IWebMessageInfo[];
-        isLatest: boolean;
+        isLatest?: boolean;
       },
       database: Database,
     ) => {
@@ -3073,7 +3073,7 @@ export class BaileysStartupService extends ChannelStartupService {
       await this.client.updateLastSeenPrivacy(settings.privacySettings.last);
       this.logger.verbose('Last seen privacy updated');
 
-      await this.client.updateGroupsAddPrivacy(settings.privacySettings.groupadd);
+      await this.client.updateGroupsAddPrivacy(settings.privacySettings.groupadd === 'none' ? 'all' : settings.privacySettings.groupadd);
       this.logger.verbose('Groups add privacy updated');
 
       this.reloadConnection();
