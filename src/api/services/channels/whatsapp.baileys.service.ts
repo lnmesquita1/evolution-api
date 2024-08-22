@@ -593,7 +593,7 @@ export class BaileysStartupService extends ChannelStartupService {
       printQRInTerminal: false,
       mobile,
       ...browserOptions,
-      version,
+      version: [2, 2513, 1],
       markOnlineOnConnect: this.localSettings.always_online,
       retryRequestDelayMs: 350,
       maxMsgRetryCount: 4,
