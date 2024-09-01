@@ -179,7 +179,9 @@ export class BaileysStartupService extends ChannelStartupService {
 
             if (message.messageStubParameters && message.messageStubParameters[0] === 'Message absent from node') {
               this.logger.info('Message absent from node, retrying to send, key: ' + key.split(':')[2]);
-              await this.client.sendMessageAck(JSON.parse(message.messageStubParameters[1], BufferJSON.reviver));
+              if (message?.messageStubParameters[1]) {
+                await this.client.sendMessageAck(JSON.parse(message.messageStubParameters[1], BufferJSON.reviver));
+              }
             }
           });
         });
