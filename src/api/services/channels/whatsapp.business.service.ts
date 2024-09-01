@@ -848,8 +848,6 @@ export class BusinessStartupService extends ChannelStartupService {
         throw messageSent.error.message.toString();
       }
 
-      console.log(content);
-
       const messageRaw: MessageRaw = {
         key: { fromMe: true, id: messageSent?.messages[0]?.id, remoteJid: this.createJid(number) },
         //pushName: messageSent.pushName,
