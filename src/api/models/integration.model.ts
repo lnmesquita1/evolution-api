@@ -7,6 +7,7 @@ export class IntegrationRaw {
   integration?: string;
   number?: string;
   token?: string;
+  webVersion?: string;
 }
 
 const integrationSchema = new Schema<IntegrationRaw>({
@@ -14,6 +15,7 @@ const integrationSchema = new Schema<IntegrationRaw>({
   integration: { type: String, required: true },
   number: { type: String, required: true },
   token: { type: String, required: true },
+  webVersion: { type: String, required: true },
 });
 
 export const IntegrationModel = dbserver?.model(IntegrationRaw.name, integrationSchema, 'integration');
