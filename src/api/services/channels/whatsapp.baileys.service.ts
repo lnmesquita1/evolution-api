@@ -588,7 +588,7 @@ export class BaileysStartupService extends ChannelStartupService {
     const integrationData = await this.repository.integration.find(this.instanceName);
     const webVersion = integrationData.webVersion 
         ? integrationData.webVersion.split('.').map(Number) 
-        : [2, 3000, 1016660381]
+        : [2, 3000, 1015901307]
 
     const socketConfig: UserFacingSocketConfig = {
       ...options,
