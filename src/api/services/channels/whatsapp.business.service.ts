@@ -271,9 +271,10 @@ export class BusinessStartupService extends ChannelStartupService {
         vcard: vcard(message.contacts[0]),
       };
     } else {
+      const contactsArray = Array.isArray(message.contacts) ? message.contacts : [];
       content.contactsArrayMessage = {
         displayName: `${message.length} contacts`,
-        contacts: message.map((contact) => {
+        contacts: contactsArray.map((contact) => {
           return {
             displayName: contact.name.formatted_name,
             vcard: vcard(contact),
