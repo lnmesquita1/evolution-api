@@ -26,7 +26,6 @@ import makeWASocket, {
   MessageUpsertType,
   MiscMessageGenerationOptions,
   ParticipantAction,
-  PHONENUMBER_MCC,
   prepareWAMessageMedia,
   proto,
   useMultiFileAuthState,
@@ -588,7 +587,7 @@ export class BaileysStartupService extends ChannelStartupService {
     const integrationData = await this.repository.integration.find(this.instanceName);
     const webVersion = integrationData.webVersion 
         ? integrationData.webVersion.split('.').map(Number) 
-        : [2, 3000, 1015901307]
+        : [2, 3000, 1017531287]
 
     const socketConfig: UserFacingSocketConfig = {
       ...options,
@@ -683,61 +682,61 @@ export class BaileysStartupService extends ChannelStartupService {
   }
 
   private async sendMobileCode() {
-    const { registration } = this.client.authState.creds || null;
+    //const { registration } = this.client.authState.creds || null;
 
-    let phoneNumber = registration.phoneNumber || this.phoneNumber;
+    // let phoneNumber = registration.phoneNumber || this.phoneNumber;
 
-    if (!phoneNumber.startsWith('+')) {
-      phoneNumber = '+' + phoneNumber;
-    }
+    // if (!phoneNumber.startsWith('+')) {
+    //   phoneNumber = '+' + phoneNumber;
+    // }
 
-    if (!phoneNumber) {
-      this.logger.error('Phone number not found');
-      return;
-    }
+    // if (!phoneNumber) {
+    //   this.logger.error('Phone number not found');
+    //   return;
+    // }
 
-    const parsedPhoneNumber = parsePhoneNumber(phoneNumber);
+    // const parsedPhoneNumber = parsePhoneNumber(phoneNumber);
 
-    if (!parsedPhoneNumber?.isValid()) {
-      this.logger.error('Phone number invalid');
-      return;
-    }
+    // if (!parsedPhoneNumber?.isValid()) {
+    //   this.logger.error('Phone number invalid');
+    //   return;
+    // }
 
-    registration.phoneNumber = parsedPhoneNumber.format('E.164');
-    registration.phoneNumberCountryCode = parsedPhoneNumber.countryCallingCode;
-    registration.phoneNumberNationalNumber = parsedPhoneNumber.nationalNumber;
+    // registration.phoneNumber = parsedPhoneNumber.format('E.164');
+    // registration.phoneNumberCountryCode = parsedPhoneNumber.countryCallingCode;
+    // registration.phoneNumberNationalNumber = parsedPhoneNumber.nationalNumber;
 
-    const mcc = await PHONENUMBER_MCC[parsedPhoneNumber.countryCallingCode];
-    if (!mcc) {
-      this.logger.error('MCC not found');
-      return;
-    }
+    // const mcc = await PHONENUMBER_MCC[parsedPhoneNumber.countryCallingCode];
+    // if (!mcc) {
+    //   this.logger.error('MCC not found');
+    //   return;
+    // }
 
-    registration.phoneNumberMobileCountryCode = mcc;
-    registration.method = 'sms';
+    //registration.phoneNumberMobileCountryCode = mcc;
+    //registration.method = 'sms';
 
-    try {
-      const response = await this.client.requestRegistrationCode(registration);
+    // try {
+    //   const response = await this.client.requestRegistrationCode(registration);
 
-      if (['ok', 'sent'].includes(response?.status)) {
-        this.logger.verbose('Registration code sent successfully');
+    //   if (['ok', 'sent'].includes(response?.status)) {
+    //     this.logger.verbose('Registration code sent successfully');
 
-        return response;
-      }
-    } catch (error) {
-      this.logger.error(error);
-    }
+    //     return response;
+    //   }
+    // } catch (error) {
+    //   this.logger.error(error);
+    // }
   }
 
   public async receiveMobileCode(code: string) {
-    await this.client
-      .register(code.replace(/["']/g, '').trim().toLowerCase())
-      .then(async () => {
-        this.logger.verbose('Registration code received successfully');
-      })
-      .catch((error) => {
-        this.logger.error(error);
-      });
+    // await this.client
+    //   .register(code.replace(/["']/g, '').trim().toLowerCase())
+    //   .then(async () => {
+    //     this.logger.verbose('Registration code received successfully');
+    //   })
+    //   .catch((error) => {
+    //     this.logger.error(error);
+    //   });
   }
 
   public async reloadConnection(): Promise<WASocket> {
