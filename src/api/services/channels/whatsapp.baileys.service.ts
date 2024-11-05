@@ -612,10 +612,10 @@ export class BaileysStartupService extends ChannelStartupService {
       emitOwnEvents: false,
       shouldIgnoreJid: (jid) => {
         const isGroupJid = this.localSettings.groups_ignore && isJidGroup(jid);
-        const isBroadcast = !this.localSettings.read_status && isJidBroadcast(jid);
+        //const isBroadcast = !this.localSettings.read_status && isJidBroadcast(jid);
         const isNewsletter = isJidNewsletter(jid);
 
-        return isGroupJid || isBroadcast || isNewsletter;
+        return isGroupJid || isNewsletter;
       },
       msgRetryCounterCache: this.msgRetryCounterCache,
       getMessage: async (key) => (await this.getMessage(key)) as Promise<proto.IMessage>,
