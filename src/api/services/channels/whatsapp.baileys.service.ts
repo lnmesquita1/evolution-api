@@ -18,9 +18,9 @@ import makeWASocket, {
   getContentType,
   getDevice,
   GroupMetadata,
-  isJidBroadcast,
   isJidGroup,
   isJidNewsletter,
+  isJidStatusBroadcast,
   isJidUser,
   makeCacheableSignalKeyStore,
   MessageUpsertType,
@@ -611,10 +611,10 @@ export class BaileysStartupService extends ChannelStartupService {
       emitOwnEvents: false,
       shouldIgnoreJid: (jid) => {
         const isGroupJid = this.localSettings.groups_ignore && isJidGroup(jid);
-        //const isBroadcast = !this.localSettings.read_status && isJidBroadcast(jid);
+        const isBroadcast = !this.localSettings.read_status && isJidStatusBroadcast(jid);
         const isNewsletter = isJidNewsletter(jid);
 
-        return isGroupJid || isNewsletter;
+        return isGroupJid || isBroadcast || isNewsletter;
       },
       msgRetryCounterCache: this.msgRetryCounterCache,
       getMessage: async (key) => (await this.getMessage(key)) as Promise<proto.IMessage>,
