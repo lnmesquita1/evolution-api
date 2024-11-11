@@ -1119,13 +1119,7 @@ export class BaileysStartupService extends ChannelStartupService {
             return;
           }
 
-          const isMedia =
-            received?.message?.imageMessage ||
-            received?.message?.videoMessage ||
-            received?.message?.stickerMessage ||
-            received?.message?.documentMessage ||
-            received?.message?.documentWithCaptionMessage ||
-            received?.message?.audioMessage;
+          const isMedia = this.isMedia(received.message);
 
           const contentMsg = received?.message[getContentType(received.message)] as any;
 
@@ -2899,6 +2893,45 @@ export class BaileysStartupService extends ChannelStartupService {
         message: ['An error occurred while archiving the chat. Open a calling.', error.toString()],
       });
     }
+  }
+
+  private isMedia = (message: proto.IMessage): boolean => {
+    type MediaTypes = 'audioMessage' | 'imageMessage' | 'videoMessage' | 'documentMessage' | 'stickerMessage';
+    const mediaTypes: MediaTypes[] = [
+      'audioMessage',
+      'imageMessage',
+      'videoMessage',
+      'documentMessage',
+      'stickerMessage',
+    ];
+  
+    for (const type of mediaTypes) {
+      if (message[type]) {
+        return true;
+      }
+    }
+  
+    const nestedPaths = [
+      message.ephemeralMessage?.message,
+      message.ephemeralMessage?.message?.viewOnceMessage?.message,
+      message.ephemeralMessage?.message?.viewOnceMessageV2?.message,
+      message.viewOnceMessage?.message,
+      message.viewOnceMessageV2?.message,
+      message.extendedTextMessage?.contextInfo?.quotedMessage,
+      message.documentWithCaptionMessage?.message,
+    ];
+  
+    for (const nested of nestedPaths) {
+      if (nested) {
+        for (const type of mediaTypes) {
+          if (nested[type]) {
+            return true;
+          }
+        }
+      }
+    }
+  
+    return false;
   }
 
   public async markChatUnread(data: MarkChatUnreadDto) {
