@@ -1123,7 +1123,7 @@ export class BaileysStartupService extends ChannelStartupService {
 
           const contentMsg = received?.message[getContentType(received.message)] as any;
 
-          if (this.localWebhook.webhook_base64 === true && isMedia) {
+          if (isMedia) {
             const buffer = await downloadMediaMessage(
               { key: received.key, message: received?.message },
               'buffer',
@@ -2083,7 +2083,7 @@ export class BaileysStartupService extends ChannelStartupService {
 
       const contentMsg = messageSent.message[getContentType(messageSent.message)] as any;
 
-      const messageRaw: MessageRaw = {
+      const messageRaw: any = {
         key: messageSent.key,
         pushName: messageSent.pushName,
         message: { ...messageSent.message },
@@ -2094,21 +2094,32 @@ export class BaileysStartupService extends ChannelStartupService {
         source: getDevice(messageSent.key.id),
       };
 
-      this.logger.log(messageRaw);
-
-      this.logger.verbose('Sending data to webhook in event SEND_MESSAGE');
-      this.sendDataWebhook(Events.SEND_MESSAGE, messageRaw);
-
-      if (this.localChatwoot.enabled && !isChatwoot) {
-        this.chatwootService.eventWhatsapp(Events.SEND_MESSAGE, { instanceName: this.instance.name }, messageRaw);
-      }
-
       this.logger.verbose('Inserting message in database');
       await this.repository.message.insert(
         [messageRaw],
         this.instance.name,
         this.configService.get<Database>('DATABASE').SAVE_DATA.NEW_MESSAGE,
       );
+
+      const isMedia = this.isMedia(messageSent.message);
+      if (isMedia) {
+        const buffer = await downloadMediaMessage(
+          { key: messageRaw.key, message: messageRaw?.message },
+          'buffer',
+          {},
+          {
+            logger: P({ level: 'error' }) as any,
+            reuploadRequest: this.client.updateMediaMessage,
+          },
+        );
+
+        messageRaw.message.base64 = buffer ? buffer.toString('base64') : undefined;
+      }
+
+      this.logger.log(messageRaw);
+
+      this.logger.verbose('Sending data to webhook in event SEND_MESSAGE');
+      this.sendDataWebhook(Events.SEND_MESSAGE, messageRaw);
 
       return messageSent;
     } catch (error) {
