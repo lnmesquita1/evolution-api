@@ -2928,7 +2928,6 @@ export class BaileysStartupService extends ChannelStartupService {
       message.ephemeralMessage?.message?.viewOnceMessageV2?.message,
       message.viewOnceMessage?.message,
       message.viewOnceMessageV2?.message,
-      message.extendedTextMessage?.contextInfo?.quotedMessage,
       message.documentWithCaptionMessage?.message,
     ];
   
