@@ -1119,6 +1119,20 @@ export class BaileysStartupService extends ChannelStartupService {
             return;
           }
 
+          // Resposta de texto em algum status
+          if (received.message?.extendedTextMessage?.contextInfo?.remoteJid === 'status@broadcast' &&
+            received.message?.extendedTextMessage?.contextInfo?.quotedMessage
+          ) {
+            const caption = received.message.extendedTextMessage.text;
+            received.message = received.message.extendedTextMessage.contextInfo.quotedMessage;
+            if (received.message.imageMessage) {
+              received.message.imageMessage.caption = caption;
+            }
+            if (received.message.videoMessage) {
+              received.message.videoMessage.caption = caption;
+            }
+          }
+
           const isMedia = this.isMedia(received.message);
 
           const contentMsg = received?.message[getContentType(received.message)] as any;
