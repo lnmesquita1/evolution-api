@@ -1119,17 +1119,25 @@ export class BaileysStartupService extends ChannelStartupService {
             return;
           }
 
-          const isMedia =
-            received?.message?.imageMessage ||
-            received?.message?.videoMessage ||
-            received?.message?.stickerMessage ||
-            received?.message?.documentMessage ||
-            received?.message?.documentWithCaptionMessage ||
-            received?.message?.audioMessage;
+          // Resposta de texto em algum status
+          if (received.message?.extendedTextMessage?.contextInfo?.remoteJid === 'status@broadcast' &&
+            received.message?.extendedTextMessage?.contextInfo?.quotedMessage
+          ) {
+            const caption = received.message.extendedTextMessage.text;
+            received.message = received.message.extendedTextMessage.contextInfo.quotedMessage;
+            if (received.message.imageMessage) {
+              received.message.imageMessage.caption = caption;
+            }
+            if (received.message.videoMessage) {
+              received.message.videoMessage.caption = caption;
+            }
+          }
+
+          const isMedia = this.isMedia(received.message);
 
           const contentMsg = received?.message[getContentType(received.message)] as any;
 
-          if (this.localWebhook.webhook_base64 === true && isMedia) {
+          if (isMedia) {
             const buffer = await downloadMediaMessage(
               { key: received.key, message: received?.message },
               'buffer',
@@ -2089,7 +2097,7 @@ export class BaileysStartupService extends ChannelStartupService {
 
       const contentMsg = messageSent.message[getContentType(messageSent.message)] as any;
 
-      const messageRaw: MessageRaw = {
+      const messageRaw: any = {
         key: messageSent.key,
         pushName: messageSent.pushName,
         message: { ...messageSent.message },
@@ -2100,21 +2108,32 @@ export class BaileysStartupService extends ChannelStartupService {
         source: getDevice(messageSent.key.id),
       };
 
-      this.logger.log(messageRaw);
-
-      this.logger.verbose('Sending data to webhook in event SEND_MESSAGE');
-      this.sendDataWebhook(Events.SEND_MESSAGE, messageRaw);
-
-      if (this.localChatwoot.enabled && !isChatwoot) {
-        this.chatwootService.eventWhatsapp(Events.SEND_MESSAGE, { instanceName: this.instance.name }, messageRaw);
-      }
-
       this.logger.verbose('Inserting message in database');
       await this.repository.message.insert(
         [messageRaw],
         this.instance.name,
         this.configService.get<Database>('DATABASE').SAVE_DATA.NEW_MESSAGE,
       );
+
+      const isMedia = this.isMedia(messageSent.message);
+      if (isMedia) {
+        const buffer = await downloadMediaMessage(
+          { key: messageRaw.key, message: messageRaw?.message },
+          'buffer',
+          {},
+          {
+            logger: P({ level: 'error' }) as any,
+            reuploadRequest: this.client.updateMediaMessage,
+          },
+        );
+
+        messageRaw.message.base64 = buffer ? buffer.toString('base64') : undefined;
+      }
+
+      this.logger.log(messageRaw);
+
+      this.logger.verbose('Sending data to webhook in event SEND_MESSAGE');
+      this.sendDataWebhook(Events.SEND_MESSAGE, messageRaw);
 
       return messageSent;
     } catch (error) {
@@ -2899,6 +2918,44 @@ export class BaileysStartupService extends ChannelStartupService {
         message: ['An error occurred while archiving the chat. Open a calling.', error.toString()],
       });
     }
+  }
+
+  private isMedia = (message: proto.IMessage): boolean => {
+    type MediaTypes = 'audioMessage' | 'imageMessage' | 'videoMessage' | 'documentMessage' | 'stickerMessage';
+    const mediaTypes: MediaTypes[] = [
+      'audioMessage',
+      'imageMessage',
+      'videoMessage',
+      'documentMessage',
+      'stickerMessage',
+    ];
+  
+    for (const type of mediaTypes) {
+      if (message[type]) {
+        return true;
+      }
+    }
+  
+    const nestedPaths = [
+      message.ephemeralMessage?.message,
+      message.ephemeralMessage?.message?.viewOnceMessage?.message,
+      message.ephemeralMessage?.message?.viewOnceMessageV2?.message,
+      message.viewOnceMessage?.message,
+      message.viewOnceMessageV2?.message,
+      message.documentWithCaptionMessage?.message,
+    ];
+  
+    for (const nested of nestedPaths) {
+      if (nested) {
+        for (const type of mediaTypes) {
+          if (nested[type]) {
+            return true;
+          }
+        }
+      }
+    }
+  
+    return false;
   }
 
   public async markChatUnread(data: MarkChatUnreadDto) {
