@@ -2580,7 +2580,7 @@ export class BaileysStartupService extends ChannelStartupService {
             ptt: true,
             mimetype: 'audio/mp4',
           },
-          { presence: 'recording', delay: data?.options?.delay },
+          { presence: 'recording', delay: data?.options?.delay, quoted: data?.options?.quoted },
           isChatwoot,
         );
 
