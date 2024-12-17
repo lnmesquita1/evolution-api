@@ -33,6 +33,12 @@ export class MessageRaw {
   chatwoot?: ChatwootMessage;
   contextInfo?: any;
   status?: wa.StatusMessage | any;
+  groupInfo?: GroupInfo; 
+}
+
+class GroupInfo {
+  id: string;
+  subject: string
 }
 
 type MessageRawBoolean<T> = {
