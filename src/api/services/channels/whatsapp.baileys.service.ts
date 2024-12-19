@@ -1065,10 +1065,20 @@ export class BaileysStartupService extends ChannelStartupService {
             }
           }
 
+          let groupInfo;
+          const { remoteJid } = received.key;
+          if (isJidGroup(remoteJid)) {
+            const groupMetaData = await this.getGroupMetadataCache(remoteJid);
+            groupInfo = {
+              id: groupMetaData.id,
+              subject: groupMetaData.subject
+            }
+          }
+
           if (received.messageStubParameters && received.messageStubParameters[0] === 'Message absent from node') {
             this.logger.info('Recovering message lost');
             await this.baileysCache.set(received.key.id, received);
-            
+
             messageRaw = {
               key: received.key,
               pushName: received.pushName,
@@ -1076,14 +1086,15 @@ export class BaileysStartupService extends ChannelStartupService {
               message: {},
               messageTimestamp: received.messageTimestamp as number,
               owner: this.instance.name,
-              source: getDevice(received.key.id),
+              source: getDevice(received.key.id)
             };
-
-            this.logger.verbose('Sending data ciphertext to webhook in event MESSAGES_UPSERT');
-            this.sendDataWebhook(Events.MESSAGES_UPSERT, messageRaw);
 
             this.logger.verbose('Inserting ciphertext in database');
             await this.repository.message.insert([messageRaw], this.instance.name, database.SAVE_DATA.NEW_MESSAGE);
+
+            this.logger.verbose('Sending data ciphertext to webhook in event MESSAGES_UPSERT');
+            messageRaw.groupInfo = groupInfo;
+            this.sendDataWebhook(Events.MESSAGES_UPSERT, messageRaw);
             
             continue;
           }
@@ -1181,49 +1192,11 @@ export class BaileysStartupService extends ChannelStartupService {
             await this.client.readMessages([received.key]);
           }
 
+          messageRaw.groupInfo = groupInfo;
           this.logger.log(messageRaw);
 
           this.logger.verbose('Sending data to webhook in event MESSAGES_UPSERT');
           this.sendDataWebhook(Events.MESSAGES_UPSERT, messageRaw);
-
-          if (this.localChatwoot.enabled && !received.key.id.includes('@broadcast')) {
-            const chatwootSentMessage = await this.chatwootService.eventWhatsapp(
-              Events.MESSAGES_UPSERT,
-              { instanceName: this.instance.name },
-              messageRaw,
-            );
-
-            if (chatwootSentMessage?.id) {
-              messageRaw.chatwoot = {
-                messageId: chatwootSentMessage.id,
-                inboxId: chatwootSentMessage.inbox_id,
-                conversationId: chatwootSentMessage.conversation_id,
-              };
-            }
-          }
-
-          const typebotSessionRemoteJid = this.localTypebot.sessions?.find(
-            (session) => session.remoteJid === received.key.remoteJid,
-          );
-
-          if ((this.localTypebot.enabled && type === 'notify') || typebotSessionRemoteJid) {
-            if (!(this.localTypebot.listening_from_me === false && messageRaw.key.fromMe === true)) {
-              if (messageRaw.messageType !== 'reactionMessage')
-                await this.typebotService.sendTypebot(
-                  { instanceName: this.instance.name },
-                  messageRaw.key.remoteJid,
-                  messageRaw,
-                );
-            }
-          }
-
-          if (this.localChamaai.enabled && messageRaw.key.fromMe === false && type === 'notify') {
-            await this.chamaaiService.sendChamaai(
-              { instanceName: this.instance.name },
-              messageRaw.key.remoteJid,
-              messageRaw,
-            );
-          }
 
           this.logger.verbose('Inserting message in database');
           await this.repository.message.insert([messageRaw], this.instance.name, database.SAVE_DATA.NEW_MESSAGE);
@@ -1256,14 +1229,6 @@ export class BaileysStartupService extends ChannelStartupService {
 
             this.logger.verbose('Sending data to webhook in event CONTACTS_UPDATE');
             this.sendDataWebhook(Events.CONTACTS_UPDATE, contactRaw);
-
-            if (this.localChatwoot.enabled) {
-              await this.chatwootService.eventWhatsapp(
-                Events.CONTACTS_UPDATE,
-                { instanceName: this.instance.name },
-                contactRaw,
-              );
-            }
 
             this.logger.verbose('Updating contact in database');
             await this.repository.contact.update([contactRaw], this.instance.name, database.SAVE_DATA.CONTACTS);
@@ -2130,6 +2095,17 @@ export class BaileysStartupService extends ChannelStartupService {
         messageRaw.message.base64 = buffer ? buffer.toString('base64') : undefined;
       }
 
+      let groupInfo;
+      const { remoteJid } = messageSent.key;
+      if (isJidGroup(remoteJid)) {
+        const groupMetaData = await this.getGroupMetadataCache(remoteJid);
+        groupInfo = {
+          id: groupMetaData.id,
+          subject: groupMetaData.subject
+        }
+      }
+
+      messageRaw.groupInfo = groupInfo;
       this.logger.log(messageRaw);
 
       this.logger.verbose('Sending data to webhook in event SEND_MESSAGE');
