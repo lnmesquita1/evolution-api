@@ -67,6 +67,7 @@ export class WebhookController {
 
   public async receiveWebhook(data: any) {
     const wabaId = data.entry[0].id;
+    logger.verbose('DATA FOR META WEBHOOK: ' + JSON.stringify(data))
     logger.verbose('requested receiveWebhook from wabaId: ' + wabaId + ' instance');
     return await this.waMonitor.waInstances[wabaId].connectToWhatsapp(data);
   }
